@@ -661,8 +661,7 @@ svg.addEventListener('mousedown', e => {
     if(!hs) addState(x,y);
   } else if(A.tool==='addTransition') {
     if(hs) {
-      if(!A.tsrc){ A.tsrc=hs.id; setStatus(`Origen: ${hs.label} — Ahora clic en el destino`); hint('Haz clic en el estado DESTINO'); render(); }
-      else { A.pend={from:A.tsrc,to:hs.id}; A.tsrc=null; clearPr(); render(); openModal(); }
+if(A.tsrc === null){ A.tsrc=hs.id; setStatus(`Origen: ${hs.label} — Ahora clic en el destino`); hint('Haz clic en el estado DESTINO'); render(); }      else { A.pend={from:A.tsrc,to:hs.id}; A.tsrc=null; clearPr(); render(); openModal(); }
     }
   } else if(A.tool==='delete') {
     if(hs) delState(hs.id);
