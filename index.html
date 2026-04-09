@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutomataLab — Diseñador de Autómatas Finitos</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e1117; --surface: #161b27; --surface2: #1e2535; --border: #2d3748;
+  --accent: #f59e0b; --accent2: #3b82f6; --success: #10b981; --error: #ef4444;
+  --text: #e2e8f0; --muted: #94a3b8;
+  --state-fill: #1a2744; --state-stroke: #3b82f6; --canvas-bg: #080d16;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family:'Lora',serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+header { padding:10px 18px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-shrink:0; }
+header h1 { font-family:'JetBrains Mono',monospace; font-size:17px; color:var(--accent); letter-spacing:-0.5px; }
+header .sub { font-size:12px; color:var(--muted); font-style:italic; }
+.head-btns { margin-left:auto; display:flex; gap:8px; }
+
+.main { display:flex; flex:1; overflow:hidden; }
+
+/* TOOLBAR */
+.toolbar { width:195px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:10px; gap:6px; overflow-y:auto; flex-shrink:0; }
+.tb-head { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; padding:4px 0 3px; border-bottom:1px solid var(--border); margin-top:4px; }
+.tool-btn { display:flex; align-items:center; gap:9px; padding:9px 10px; border:1px solid var(--border); background:transparent; color:var(--text); border-radius:6px; cursor:pointer; font-family:'Lora',serif; font-size:12px; transition:all 0.15s; text-align:left; width:100%; }
+.tool-btn:hover { border-color:var(--accent2); background:rgba(59,130,246,0.08); }
+.tool-btn.active { border-color:var(--accent); background:rgba(245,158,11,0.12); color:var(--accent); }
+.tool-btn .ic { width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+.tool-btn small { display:block; font-size:10px; color:var(--muted); margin-top:1px; }
+
+.state-props { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px; display:none; }
+.state-props.vis { display:block; }
+.state-props h4 { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); margin-bottom:9px; }
+.prop-row { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
+.prop-row label { font-size:10px; color:var(--muted); }
+.prop-input { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:5px 8px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:14px; width:100%; }
+.prop-input:focus { outline:none; border-color:var(--accent2); }
+.tog-btn { width:100%; padding:7px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:10px; cursor:pointer; transition:all 0.15s; }
+.tog-btn.on { border-color:var(--success); background:rgba(16,185,129,0.12); color:var(--success); }
+.no-sel { font-size:11px; color:var(--muted); font-style:italic; text-align:center; padding:6px 0; }
+
+.stats { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); line-height:1.9; }
+.stats span { color:var(--accent2); }
+
+/* CANVAS */
+#canvas-wrap { flex:1; position:relative; overflow:hidden; background:var(--canvas-bg); cursor:default; }
+#canvas-wrap.cur-addState { cursor:crosshair; }
+#canvas-wrap.cur-delete { cursor:not-allowed; }
+#canvas-wrap.cur-addTransition { cursor:cell; }
+#svg { width:100%; height:100%; display:block; user-select:none; }
+
+.state-g { cursor:pointer; }
+.sc { fill:var(--state-fill); stroke:var(--state-stroke); stroke-width:2; }
+.sc.acc { stroke:var(--success); }
+.sc.sel { stroke:var(--accent); fill:rgba(245,158,11,0.12); }
+.sc.src { stroke:var(--accent2); stroke-width:3; fill:rgba(59,130,246,0.18); }
+.sc.hi  { stroke:var(--success); fill:rgba(16,185,129,0.18); }
+.so { fill:none; stroke:var(--success); stroke-width:1.5; }
+.so.sel { stroke:var(--accent); }
+.so.hi  { stroke:var(--success); }
+.sl { fill:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+.ia { stroke:var(--accent); stroke-width:2; fill:none; marker-end:url(#mAmber); pointer-events:none; }
+.tp { fill:none; stroke:#3a4a5e; stroke-width:1.8; marker-end:url(#mGray); cursor:pointer; }
+.tp:hover { stroke:var(--accent2); stroke-width:2.2; marker-end:url(#mBlue); }
+.tp.sel { stroke:var(--accent); stroke-width:2.5; marker-end:url(#mAmber); }
+.tp.hi  { stroke:var(--success); stroke-width:2.5; marker-end:url(#mGreen); }
+.tl { fill:#64748b; font-family:'JetBrains Mono',monospace; font-size:12px; text-anchor:middle; dominant-baseline:central; pointer-events:none; }
+.tl.hi { fill:var(--success); font-weight:700; }
+.prev { fill:none; stroke:var(--accent2); stroke-width:1.5; stroke-dasharray:7,4; pointer-events:none; marker-end:url(#mBlue); }
+
+/* THEORY PANEL */
+.rpanel { width:295px; background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; flex-shrink:0; }
+.tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.tab { flex:1; padding:9px 5px; background:transparent; border:none; color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:9px; cursor:pointer; transition:all 0.15s; text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid transparent; }
+.tab:hover { color:var(--text); }
+.tab.on { color:var(--accent); border-bottom-color:var(--accent); }
+.pane { flex:1; overflow-y:auto; padding:14px; display:none; }
+.pane.on { display:block; }
+
+.tc { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:13px; margin-bottom:11px; }
+.tc h4 { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+.tc p, .tc li { font-size:12.5px; color:#cbd5e1; line-height:1.65; margin-bottom:5px; }
+.tc ul { padding-left:14px; }
+.tc li { margin-bottom:3px; }
+.formula { background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:7px 11px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent2); margin:7px 0; }
+.tip { background:rgba(245,158,11,0.08); border-left:3px solid var(--accent); padding:7px 9px; border-radius:0 4px 4px 0; font-size:11.5px; color:#fcd34d; margin-top:7px; font-style:italic; }
+.tc strong { color:var(--accent2); }
+@keyframes glow { 0%,100%{border-color:var(--border)} 50%{border-color:var(--accent);box-shadow:0 0 12px rgba(245,158,11,0.2)} }
+.new-card { animation:glow 1.8s ease-in-out; }
+
+/* Simulate tab */
+.sim-row { display:flex; gap:7px; margin-bottom:10px; }
+.sim-in { flex:1; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:7px 11px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:14px; }
+.sim-in:focus { outline:none; border-color:var(--accent2); }
+.sbtn { padding:7px 12px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer; transition:all 0.15s; }
+.sbtn:hover { border-color:var(--accent2); color:var(--accent2); }
+.sbtn.p { border-color:var(--accent); background:rgba(245,158,11,0.1); color:var(--accent); }
+.sim-res { padding:9px 13px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:10px; display:none; }
+.sim-res.ok { background:rgba(16,185,129,0.12); border:1px solid var(--success); color:var(--success); display:block; }
+.sim-res.fail { background:rgba(239,68,68,0.12); border:1px solid var(--error); color:#fca5a5; display:block; }
+.strace { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+.sstep { display:flex; align-items:center; gap:7px; padding:3px 0; border-bottom:1px solid rgba(45,55,72,0.4); }
+.sstep.cur { background:rgba(59,130,246,0.1); border-radius:4px; padding:3px 6px; }
+.ss { color:var(--accent2); } .sy { color:var(--accent); } .sa { color:#475569; }
+
+/* Formal def */
+.fdef { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:11px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.9; color:#94a3b8; }
+.fdef .dk { color:var(--accent2); } .fdef .dv { color:var(--accent); }
+
+/* Status bar */
+.sbar { padding:5px 15px; background:var(--surface); border-top:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); display:flex; justify-content:space-between; flex-shrink:0; }
+
+/* Modal */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-bg.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px; width:310px; }
+.modal h3 { font-family:'JetBrains Mono',monospace; color:var(--accent); font-size:13px; margin-bottom:10px; }
+.modal p { font-size:12px; color:var(--muted); margin-bottom:12px; }
+.modal input { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:16px; margin-bottom:15px; }
+.modal input:focus { outline:none; border-color:var(--accent2); }
+.mbns { display:flex; gap:8px; justify-content:flex-end; }
+.bcancel { padding:7px 14px; border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:12px; }
+.bok { padding:7px 14px; border:1px solid var(--accent); background:rgba(245,158,11,0.12); color:var(--accent); border-radius:6px; cursor:pointer; font-size:12px; font-family:'JetBrains Mono',monospace; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* Tooltip */
+#hint { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); background:rgba(8,13,22,0.92); border:1px solid var(--border); color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11px; padding:5px 13px; border-radius:4px; pointer-events:none; white-space:nowrap; z-index:10; display:none; }
+
+.hbtn { padding:6px 12px; border-radius:5px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:11px; cursor:pointer; }
+.hbtn:hover { border-color:var(--accent2); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ AutomataLab</h1>
+  <div class="sub">Diseñador Interactivo de Autómatas Finitos — Teoría de Lenguajes Formales</div>
+  <div class="head-btns">
+    <button class="hbtn" onclick="loadExample()">📂 Cargar Ejemplo</button>
+    <button class="hbtn" onclick="clearAll()">🗑 Limpiar</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="tb-head">Herramientas</div>
+
+    <button class="tool-btn active" id="btn-select" onclick="setTool('select')">
+      <span class="ic">↖</span>
+      <span>Seleccionar<small>Mover / editar</small></span>
+    </button>
+    <button class="tool-btn" id="btn-addState" onclick="setTool('addState')">
+      <span class="ic">○</span>
+      <span>Agregar Estado<small>Clic en el canvas</small></span>
+    </button>
+    <button class="tool-btn" id="btn-addTransition" onclick="setTool('addTransition')">
+      <span class="ic">→</span>
+      <span>Agregar Transición<small>Estado → Estado</small></span>
+    </button>
+    <button class="tool-btn" id="btn-delete" onclick="setTool('delete')">
+      <span class="ic">✕</span>
+      <span>Eliminar<small>Clic en elemento</small></span>
+    </button>
+
+    <div class="tb-head">Propiedades</div>
+
+    <div class="state-props" id="sprops">
+      <h4>Estado Seleccionado</h4>
+      <div class="prop-row">
+        <label>Etiqueta</label>
+        <input type="text" class="prop-input" id="plabel" maxlength="5" oninput="updLabel(this.value)" placeholder="q0">
+      </div>
+      <div class="prop-row">
+        <button class="tog-btn" id="btninit" onclick="togInit()">→ Estado Inicial</button>
+      </div>
+      <div class="prop-row">
+        <button class="tog-btn" id="btnacc" onclick="togAcc()">◎ Estado Aceptación</button>
+      </div>
+    </div>
+    <div class="no-sel" id="nosel">Selecciona un estado para ver sus propiedades</div>
+
+    <div class="tb-head">Estadísticas</div>
+    <div class="stats">
+      Estados: <span id="stQ">0</span><br>
+      Transiciones: <span id="stT">0</span><br>
+      Alfabeto: <span id="stS">{}</span><br>
+      Tipo: <span id="stType">—</span>
+    </div>
+  </div>
+
+  <!-- SVG CANVAS -->
+  <div id="canvas-wrap">
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="mGray"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#3a4a5e"/></marker>
+        <marker id="mAmber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#f59e0b"/></marker>
+        <marker id="mBlue"  markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#3b82f6"/></marker>
+        <marker id="mGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#10b981"/></marker>
+        <pattern id="grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <circle cx="0"  cy="0"  r="0.9" fill="#141929"/>
+          <circle cx="40" cy="0"  r="0.9" fill="#141929"/>
+          <circle cx="0"  cy="40" r="0.9" fill="#141929"/>
+          <circle cx="40" cy="40" r="0.9" fill="#141929"/>
+          <circle cx="20" cy="20" r="0.5" fill="#111626"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+      <g id="vp">
+        <g id="tl-layer"></g>
+        <g id="sl-layer"></g>
+        <g id="pr-layer"></g>
+      </g>
+    </svg>
+    <div id="hint"></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="rpanel">
+    <div class="tabs">
+      <button class="tab on" onclick="switchTab('theory',0)">Teoría</button>
+      <button class="tab" onclick="switchTab('simulate',1)">Simular</button>
+      <button class="tab" onclick="switchTab('formal',2)">Definición</button>
+    </div>
+
+    <div class="pane on" id="ptheory"><div id="theory-box"></div></div>
+
+    <div class="pane" id="psimulate">
+      <div class="tc">
+        <h4>Probar Cadena</h4>
+        <p style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Ingresa una cadena y ejecuta el autómata sobre ella.</p>
+        <div class="sim-row">
+          <input type="text" class="sim-in" id="sim-str" placeholder="ej: 0110" onkeydown="if(event.key==='Enter')runSim()">
+          <button class="sbtn p" onclick="runSim()">▶ Run</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <button class="sbtn" onclick="stepSim()">Paso a Paso</button>
+          <button class="sbtn" onclick="resetSim()">↺ Reset</button>
+        </div>
+        <div class="sim-res" id="sim-res"></div>
+      </div>
+      <div class="tc" id="trace-card" style="display:none;">
+        <h4>Traza de Ejecución</h4>
+        <div class="strace" id="trace-box"></div>
+      </div>
+      <div class="tc">
+        <h4>Cadena Vacía ε</h4>
+        <p>Para probar la cadena vacía, deja el campo en blanco y presiona Run. La cadena vacía es aceptada si el estado inicial es también de aceptación.</p>
+        <div class="tip">💡 ε (épsilon) denota la cadena sin ningún símbolo, con longitud 0.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pformal">
+      <div class="tc">
+        <h4>Definición Formal M = (Q, Σ, δ, q₀, F)</h4>
+        <div class="fdef">
+          <div><span class="dk">Q</span> = <span class="dv" id="fQ">{}</span></div>
+          <div><span class="dk">Σ</span> = <span class="dv" id="fS">{}</span></div>
+          <div><span class="dk">q₀</span> = <span class="dv" id="fq0">—</span></div>
+          <div><span class="dk">F</span> = <span class="dv" id="fF">{}</span></div>
+          <br>
+          <div style="color:#475569;margin-bottom:4px;">δ (transiciones):</div>
+          <div id="fDelta" style="color:var(--muted);">—</div>
+        </div>
+      </div>
+      <div class="tc">
+        <h4>Significado de la Tupla</h4>
+        <ul>
+          <li><strong>Q</strong> — Conjunto finito de estados</li>
+          <li><strong>Σ</strong> — Alfabeto: símbolos que puede leer</li>
+          <li><strong>δ</strong> — Función de transición δ: Q×Σ→Q</li>
+          <li><strong>q₀</strong> — Estado inicial (q₀ ∈ Q)</li>
+          <li><strong>F</strong> — Estados de aceptación (F ⊆ Q)</li>
+        </ul>
+        <div class="formula">L(M) = { w ∈ Σ* | δ*(q₀,w) ∈ F }</div>
+        <div class="tip">El lenguaje del autómata es el conjunto de todas las cadenas que acepta.</div>
+      </div>
+      <div class="tc">
+        <h4>AFD vs AFN</h4>
+        <p><strong>AFD</strong> (Determinista): para cada (estado, símbolo) existe exactamente una transición. δ: Q×Σ → Q</p>
+        <p><strong>AFN</strong> (No Determinista): puede haber 0 o más transiciones. δ: Q×Σ → 2^Q</p>
+        <div class="tip">⚡ Todo AFN puede convertirse en un AFD equivalente (construcción de subconjuntos).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sbar">
+  <span id="status">Listo — Elige una herramienta para comenzar</span>
+  <span id="coords" style="color:#2d3748;">x:0 y:0</span>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h3>Símbolo(s) de Transición</h3>
+    <p>Ingresa los símbolos separados por coma.<br>Ejemplos: <code style="color:var(--accent2)">0</code> &nbsp; <code style="color:var(--accent2)">a,b</code> &nbsp; <code style="color:var(--accent2)">0,1</code></p>
+    <input type="text" id="modal-in" placeholder="símbolo" maxlength="30" onkeydown="if(event.key==='Enter')okModal()">
+    <div class="mbns">
+      <button class="bcancel" onclick="cancelModal()">Cancelar</button>
+      <button class="bok" onclick="okModal()">Agregar ✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONSTANTS & STATE
+// ═══════════════════════════════════════════
+const R = 28; // state radius
+
+const A = {
+  states: [],       // {id,x,y,label,accepting}
+  transitions: [],  // {id,from,to,symbols:[]}
+  init: null,       // initial state id
+  nid: 0,           // next id counter
+  tool: 'select',
+  sel: null,        // {type:'state'|'transition', id}
+  tsrc: null,       // transition source state id
+  pend: null,       // pending transition {from,to}
+  drag: null,       // {id,ox,oy}
+  pan: false,
+  panS: null,
+  panOff: {x:0,y:0},
+  sim: { on:false, str:'', idx:0, cur:null, hist:[], lastSym:null }
+};
+
+// ═══════════════════════════════════════════
+//  THEORY CONTENT
+// ═══════════════════════════════════════════
+const TH = {
+  welcome:`
+<div class="tc new-card">
+  <h4>¿Qué es un Autómata Finito?</h4>
+  <p>Un <strong>Autómata Finito (AF)</strong> es un modelo matemático que procesa cadenas de símbolos y decide si pertenecen a un lenguaje formal.</p>
+  <p>Tiene una cantidad <em>finita</em> de estados y transita entre ellos según los símbolos que lee.</p>
+  <div class="formula">M = (Q, Σ, δ, q₀, F)</div>
+  <div class="tip">💡 Comienza agregando estados con la herramienta "Agregar Estado" (○)</div>
+</div>
+<div class="tc">
+  <h4>¿Para qué sirven?</h4>
+  <ul>
+    <li>Reconocer <strong>lenguajes regulares</strong> (los más simples de la jerarquía de Chomsky)</li>
+    <li>Base de los <strong>analizadores léxicos</strong> en compiladores</li>
+    <li>Modelar sistemas con estados discretos (semáforos, protocolos, etc.)</li>
+    <li>Implementar <strong>expresiones regulares</strong></li>
+  </ul>
+</div>
+<div class="tc">
+  <h4>Flujo de Uso</h4>
+  <ul>
+    <li>1️⃣ Agrega <strong>estados</strong> haciendo clic en el canvas</li>
+    <li>2️⃣ Marca el <strong>estado inicial</strong> (→) y los de <strong>aceptación</strong> (◎)</li>
+    <li>3️⃣ Agrega <strong>transiciones</strong> entre estados</li>
+    <li>4️⃣ <strong>Simula</strong> cadenas en la pestaña "Simular"</li>
+  </ul>
+</div>`,
+
+  stateAdded:`
+<div class="tc new-card">
+  <h4>Estado Agregado ✓</h4>
+  <p>Un <strong>estado</strong> representa una condición o situación del autómata en un instante dado. Se visualiza como un círculo.</p>
+  <p>El conjunto de todos los estados se llama <strong>Q</strong>.</p>
+  <div class="formula">Q = {q₀, q₁, q₂, ...}</div>
+  <div class="tip">💡 Selecciónalo para marcarlo como inicial (→) o de aceptación (◎)</div>
+</div>
+<div class="tc">
+  <h4>Tipos de Estados</h4>
+  <ul>
+    <li><strong>Estado Inicial q₀</strong>: punto de entrada. Señalado con una flecha entrante. Solo puede existir uno.</li>
+    <li><strong>Estado de Aceptación F</strong>: si el autómata termina aquí, la cadena es <em>aceptada</em>. Se dibuja con doble anillo ◎.</li>
+    <li><strong>Estado Normal</strong>: estado de tránsito sin rol especial.</li>
+  </ul>
+</div>`,
+
+  tranAdded:`
+<div class="tc new-card">
+  <h4>Transición Agregada ✓</h4>
+  <p>Una <strong>transición</strong> indica qué estado sigue al leer un símbolo determinado.</p>
+  <div class="formula">δ(q, a) = p</div>
+  <p>"Desde el estado <strong>q</strong>, al leer el símbolo <strong>a</strong>, pasar al estado <strong>p</strong>"</p>
+  <div class="tip">💡 Puedes hacer transiciones de un estado a sí mismo (bucle) para ignorar ciertos símbolos</div>
+</div>
+<div class="tc">
+  <h4>El Alfabeto Σ</h4>
+  <p>Los símbolos que usas en las transiciones conforman automáticamente el <strong>alfabeto Σ</strong>.</p>
+  <div class="formula">Σ = {0, 1} &nbsp;&nbsp; binario<br>Σ = {a, b} &nbsp;&nbsp; sobre letras</div>
+  <p>La función δ se define para cada par <em>(estado, símbolo)</em>.</p>
+</div>`,
+
+  selState:`
+<div class="tc new-card">
+  <h4>Estado Seleccionado</h4>
+  <p>Usa el panel de propiedades (izquierda) para configurarlo:</p>
+  <ul>
+    <li><strong>Etiqueta</strong>: nombre visible (q0, q1, A, B...)</li>
+    <li><strong>Estado Inicial →</strong>: solo puede haber uno, es donde empieza la lectura.</li>
+    <li><strong>Estado Aceptación ◎</strong>: puede haber varios, la cadena es aceptada si se termina aquí.</li>
+  </ul>
+  <div class="tip">En la notación formal: q₀ ∈ Q y F ⊆ Q</div>
+</div>`,
+
+  tranMode:`
+<div class="tc new-card">
+  <h4>Modo: Agregar Transición</h4>
+  <p>Para crear una transición:</p>
+  <ul>
+    <li>1. Haz clic en el <strong>estado origen</strong> (se iluminará)</li>
+    <li>2. Haz clic en el <strong>estado destino</strong></li>
+    <li>3. Ingresa el símbolo en el diálogo</li>
+  </ul>
+  <div class="tip">💡 Puedes crear transiciones con múltiples símbolos separados por coma (ej: <code>0,1</code>)</div>
+</div>
+<div class="tc">
+  <h4>Transiciones en AFD vs AFN</h4>
+  <p>En un <strong>AFD</strong>: para cada (estado, símbolo) debe haber <em>exactamente una</em> transición.</p>
+  <p>En un <strong>AFN</strong>: puede haber 0, 1 o más. El autómata "explora" todos los caminos en paralelo.</p>
+</div>`,
+
+  delMode:`
+<div class="tc new-card">
+  <h4>Modo: Eliminar</h4>
+  <p>Haz clic en cualquier <strong>estado</strong> o <strong>transición</strong> para eliminarlo.</p>
+  <p>Eliminar un estado borra también todas sus transiciones asociadas.</p>
+  <div class="tip">⚠️ Esta acción no se puede deshacer</div>
+</div>`,
+
+  accepted:`
+<div class="tc new-card">
+  <h4>✅ Cadena Aceptada</h4>
+  <p>La cadena pertenece al <strong>lenguaje L(M)</strong> de este autómata.</p>
+  <p>El lenguaje es el conjunto de todas las cadenas que llevan desde el estado inicial hasta algún estado de aceptación.</p>
+  <div class="formula">w ∈ L(M) ⟺ δ*(q₀, w) ∈ F</div>
+  <div class="tip">δ* es la extensión de δ para cadenas completas (aplica δ símbolo por símbolo).</div>
+</div>`,
+
+  rejected:`
+<div class="tc new-card">
+  <h4>❌ Cadena Rechazada</h4>
+  <p>La cadena <strong>no pertenece</strong> al lenguaje del autómata. Puede ocurrir porque:</p>
+  <ul>
+    <li>El estado final no es de aceptación</li>
+    <li>No existe transición para algún símbolo leído (estado trampa implícito)</li>
+  </ul>
+  <div class="tip">💡 Revisa la traza de ejecución para identificar dónde falló.</div>
+</div>`,
+
+  noInit:`
+<div class="tc new-card">
+  <h4>⚠️ Falta Estado Inicial</h4>
+  <p>El autómata no puede ejecutarse sin un <strong>estado inicial q₀</strong>.</p>
+  <p>Selecciona un estado y presiona "→ Estado Inicial" en el panel izquierdo.</p>
+  <div class="tip">La computación siempre comienza en q₀ independientemente de la cadena.</div>
+</div>`,
+};
+
+// ═══════════════════════════════════════════
+//  RENDERING
+// ═══════════════════════════════════════════
+function render() {
+  drawTransitions();
+  drawStates();
+  updateFormal();
+  updateStats();
+}
+
+function vpt() { document.getElementById('vp').setAttribute('transform',`translate(${A.panOff.x},${A.panOff.y})`); }
+
+function drawStates() {
+  const layer = document.getElementById('sl-layer');
+  layer.innerHTML = '';
+  for (const s of A.states) {
+    const g = mkSVG('g'); g.setAttribute('class','state-g'); g.dataset.sid = s.id;
+    // Outer ring for accepting (drawn first, behind)
+    if (s.accepting) {
+      const oc = mkSVG('circle');
+      oc.setAttribute('cx',s.x); oc.setAttribute('cy',s.y); oc.setAttribute('r',R+7);
+      let ocls = 'so';
+      if (isSel('state',s.id)) ocls += ' sel';
+      if (isHi(s.id)) ocls += ' hi';
+      oc.setAttribute('class',ocls);
+      g.appendChild(oc);
+    }
+    // Main circle
+    const c = mkSVG('circle');
+    c.setAttribute('cx',s.x); c.setAttribute('cy',s.y); c.setAttribute('r',R);
+    let cls = 'sc';
+    if (s.accepting) cls += ' acc';
+    if (isSel('state',s.id)) cls += ' sel';
+    if (A.tsrc === s.id) cls += ' src';
+    if (isHi(s.id)) cls += ' hi';
+    c.setAttribute('class',cls);
+    g.appendChild(c);
+    // Label
+    const t = mkSVG('text');
+    t.setAttribute('x',s.x); t.setAttribute('y',s.y); t.setAttribute('class','sl');
+    t.textContent = s.label; g.appendChild(t);
+    // Initial arrow
+    if (A.init === s.id) {
+      const ln = mkSVG('line');
+      ln.setAttribute('x1',s.x-R-34); ln.setAttribute('y1',s.y);
+      ln.setAttribute('x2',s.x-R-2);  ln.setAttribute('y2',s.y);
+      ln.setAttribute('class','ia'); g.appendChild(ln);
+    }
+    layer.appendChild(g);
+  }
+}
+
+function drawTransitions() {
+  const layer = document.getElementById('tl-layer');
+  layer.innerHTML = '';
+  // Group by (from,to)
+  const map = new Map();
+  for (const t of A.transitions) {
+    const k = `${t.from}:${t.to}`;
+    if (!map.has(k)) map.set(k,[]);
+    map.get(k).push(t);
+  }
+  // Detect bidirectional
+  const bidir = new Set();
+  for (const [k] of map) {
+    const [a,b] = k.split(':');
+    if (map.has(`${b}:${a}`)) { bidir.add(k); bidir.add(`${b}:${a}`); }
+  }
+  for (const [key, ts] of map) {
+    const [fid,tid] = key.split(':').map(Number);
+    const fs = A.states.find(s=>s.id===fid);
+    const to = A.states.find(s=>s.id===tid);
+    if (!fs||!to) continue;
+    const syms = ts.flatMap(t=>t.symbols).join(',');
+    const isSelf = fid===tid;
+    const isBi = bidir.has(key);
+    const selT = ts.some(t=>isSel('transition',t.id));
+    const hiT = A.sim.on && ts.some(t=> t.from===A.sim.cur && A.sim.lastSym && t.symbols.includes(A.sim.lastSym));
+    if (isSelf) drawSelf(layer,fs,ts,syms,selT,hiT);
+    else drawArrow(layer,fs,to,ts,syms,isBi,selT,hiT);
+  }
+}
+
+function drawSelf(layer,s,ts,syms,sel,hi) {
+  const cx=s.x, cy=s.y;
+  const sx=cx+R*Math.sin(0.45), sy=cy-R*Math.cos(0.45);
+  const ex=cx-R*Math.sin(0.45), ey=cy-R*Math.cos(0.45);
+  const cpx=cx, cpy=cy-R-58;
+  const d=`M ${sx} ${sy} C ${sx+22} ${cpy}, ${ex-22} ${cpy}, ${ex} ${ey}`;
+  drawTPath(layer,d,cx,cy-R-46,syms,ts,sel,hi);
+}
+
+function drawArrow(layer,fs,to,ts,syms,bidir,sel,hi) {
+  const dx=to.x-fs.x, dy=to.y-fs.y, dist=Math.hypot(dx,dy);
+  const nx=dx/dist, ny=dy/dist;
+  const sx=fs.x+nx*R, sy=fs.y+ny*R;
+  const ex=to.x-nx*(R+2), ey=to.y-ny*(R+2);
+  let d, lx, ly;
+  if (bidir) {
+    const px=-ny*38, py=nx*38;
+    const cpx=(sx+ex)/2+px, cpy=(sy+ey)/2+py;
+    d=`M ${sx} ${sy} Q ${cpx} ${cpy}, ${ex} ${ey}`;
+    lx=(0.25*sx+0.5*cpx+0.25*ex); ly=(0.25*sy+0.5*cpy+0.25*ey);
+  } else {
+    d=`M ${sx} ${sy} L ${ex} ${ey}`;
+    lx=(sx+ex)/2 - ny*14; ly=(sy+ey)/2 + nx*14;
+  }
+  drawTPath(layer,d,lx,ly,syms,ts,sel,hi);
+}
+
+function drawTPath(layer,d,lx,ly,syms,ts,sel,hi) {
+  const g = mkSVG('g');
+  g.dataset.tids = ts.map(t=>t.id).join(',');
+  // Hit area
+  const hit=mkSVG('path'); hit.setAttribute('d',d);
+  hit.setAttribute('fill','none'); hit.setAttribute('stroke','transparent');
+  hit.setAttribute('stroke-width','14'); hit.setAttribute('cursor','pointer');
+  g.appendChild(hit);
+  // Visible path
+  const p=mkSVG('path'); p.setAttribute('d',d);
+  let cls='tp'; if(sel)cls+=' sel'; if(hi)cls+=' hi';
+  p.setAttribute('class',cls);
+  g.appendChild(p);
+  // Label bg
+  const tw=syms.length*8+10;
+  const bg=mkSVG('rect');
+  bg.setAttribute('x',lx-tw/2); bg.setAttribute('y',ly-9);
+  bg.setAttribute('width',tw); bg.setAttribute('height',17);
+  bg.setAttribute('rx','3'); bg.setAttribute('fill','#080d16'); bg.setAttribute('fill-opacity','0.88');
+  g.appendChild(bg);
+  // Label text
+  const lt=mkSVG('text'); lt.setAttribute('x',lx); lt.setAttribute('y',ly);
+  let lcls='tl'; if(hi)lcls+=' hi'; lt.setAttribute('class',lcls);
+  lt.textContent=syms; g.appendChild(lt);
+  layer.appendChild(g);
+}
+
+function mkSVG(tag) { return document.createElementNS('http://www.w3.org/2000/svg',tag); }
+function isSel(type,id) { return A.sel?.type===type && A.sel?.id===id; }
+function isHi(id) { return A.sim.on && A.sim.cur===id; }
+
+function drawPreview(mx,my) {
+  const pr = document.getElementById('pr-layer'); pr.innerHTML='';
+  const s = A.states.find(st=>st.id===A.tsrc); if(!s) return;
+  const dx=mx-s.x, dy=my-s.y, dist=Math.hypot(dx,dy);
+  if(dist<5) return;
+  const nx=dx/dist, ny=dy/dist;
+  const ln=mkSVG('line');
+  ln.setAttribute('x1',s.x+nx*R); ln.setAttribute('y1',s.y+ny*R);
+  ln.setAttribute('x2',mx); ln.setAttribute('y2',my);
+  ln.setAttribute('class','prev'); pr.appendChild(ln);
+}
+function clearPr() { document.getElementById('pr-layer').innerHTML=''; }
+
+// ═══════════════════════════════════════════
+//  SVG COORDS
+// ═══════════════════════════════════════════
+function svgXY(e) {
+  const r = document.getElementById('svg').getBoundingClientRect();
+  return { x: e.clientX-r.left-A.panOff.x, y: e.clientY-r.top-A.panOff.y };
+}
+function stateAt(x,y) {
+  return A.states.find(s=>Math.hypot(s.x-x,s.y-y)<=R+7);
+}
+function tranAt(e) {
+  const els=document.elementsFromPoint(e.clientX,e.clientY);
+  for(const el of els){
+    const d=el.dataset?.tids||el.parentElement?.dataset?.tids;
+    if(d) return parseInt(d.split(',')[0]);
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════
+const svg = document.getElementById('svg');
+
+svg.addEventListener('mousedown', e => {
+  if(e.button!==0) return;
+  const {x,y}=svgXY(e);
+  const hs=stateAt(x,y);
+  const ht=tranAt(e);
+
+  if(A.tool==='select') {
+    if(hs){ A.drag={id:hs.id,ox:x-hs.x,oy:y-hs.y}; selItem('state',hs.id); }
+    else if(ht){ selItem('transition',ht); }
+    else { A.pan=true; A.panS={x:e.clientX-A.panOff.x,y:e.clientY-A.panOff.y}; selItem(null); }
+  } else if(A.tool==='addState') {
+    if(!hs) addState(x,y);
+  } else if(A.tool==='addTransition') {
+    if(hs) {
+      if(!A.tsrc){ A.tsrc=hs.id; setStatus(`Origen: ${hs.label} — Ahora clic en el destino`); hint('Haz clic en el estado DESTINO'); render(); }
+      else { A.pend={from:A.tsrc,to:hs.id}; A.tsrc=null; clearPr(); render(); openModal(); }
+    }
+  } else if(A.tool==='delete') {
+    if(hs) delState(hs.id);
+    else if(ht) delTran(ht);
+  }
+});
+
+svg.addEventListener('mousemove', e => {
+  const {x,y}=svgXY(e);
+  document.getElementById('coords').textContent=`x:${Math.round(x)} y:${Math.round(y)}`;
+  if(A.drag){ const s=A.states.find(st=>st.id===A.drag.id); if(s){s.x=x-A.drag.ox;s.y=y-A.drag.oy;render();} }
+  else if(A.pan){ A.panOff.x=e.clientX-A.panS.x; A.panOff.y=e.clientY-A.panS.y; vpt(); }
+  else if(A.tsrc!==null) drawPreview(x,y);
+});
+
+svg.addEventListener('mouseup',()=>{ A.drag=null; A.pan=false; });
+svg.addEventListener('mouseleave',()=>{ A.drag=null; A.pan=false; });
+
+// Double click to toggle accepting
+svg.addEventListener('dblclick', e => {
+  if(A.tool!=='select') return;
+  const {x,y}=svgXY(e);
+  const s=stateAt(x,y);
+  if(s){ s.accepting=!s.accepting; selItem('state',s.id); render(); setStatus(`Estado ${s.label}: aceptación ${s.accepting?'activada':'desactivada'}`); }
+});
+
+// ESC to cancel
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape'){ A.tsrc=null; clearPr(); if(A.modal) cancelModal(); render(); }
+  if((e.key==='Delete'||e.key==='Backspace') && document.activeElement===document.body && A.sel) {
+    if(A.sel.type==='state') delState(A.sel.id);
+    else if(A.sel.type==='transition') delTran(A.sel.id);
+  }
+});
+
+// ═══════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════
+function addState(x,y) {
+  const id=A.nid++; const label=`q${A.states.length}`;
+  A.states.push({id,x,y,label,accepting:false});
+  if(A.states.length===1){ A.init=id; setStatus(`${label} agregado y establecido como inicial`); }
+  else setStatus(`Estado ${label} agregado`);
+  showTh('stateAdded'); render();
+}
+
+function delState(id) {
+  const s=A.states.find(st=>st.id===id);
+  A.states=A.states.filter(st=>st.id!==id);
+  A.transitions=A.transitions.filter(t=>t.from!==id&&t.to!==id);
+  if(A.init===id) A.init=null;
+  if(A.sel?.id===id) selItem(null);
+  setStatus(`Estado ${s?.label} eliminado`); render();
+}
+
+function delTran(id) {
+  A.transitions=A.transitions.filter(t=>t.id!==id);
+  if(A.sel?.id===id) selItem(null);
+  setStatus('Transición eliminada'); render();
+}
+
+function addTran(from,to,symbols) {
+  const ex=A.transitions.find(t=>t.from===from&&t.to===to);
+  if(ex){ for(const s of symbols) if(!ex.symbols.includes(s)) ex.symbols.push(s); setStatus('Símbolos añadidos a transición existente'); }
+  else {
+    const id=A.nid++;
+    A.transitions.push({id,from,to,symbols});
+    const fs=A.states.find(s=>s.id===from), ts=A.states.find(s=>s.id===to);
+    setStatus(`Transición ${fs?.label} → ${ts?.label} [${symbols.join(',')}] creada`);
+  }
+  showTh('tranAdded'); render();
+}
+
+function selItem(type,id) {
+  A.sel = type ? {type,id} : null;
+  const pr=document.getElementById('sprops'), ns=document.getElementById('nosel');
+  if(type==='state') {
+    const s=A.states.find(st=>st.id===id); if(!s) return;
+    pr.classList.add('vis'); ns.style.display='none';
+    document.getElementById('plabel').value=s.label;
+    const bi=document.getElementById('btninit'), ba=document.getElementById('btnacc');
+    if(A.init===id){ bi.classList.add('on'); bi.textContent='✓ Estado Inicial'; }
+    else { bi.classList.remove('on'); bi.textContent='→ Estado Inicial'; }
+    if(s.accepting){ ba.classList.add('on'); ba.textContent='◎ Aceptación ✓'; }
+    else { ba.classList.remove('on'); ba.textContent='◎ Estado Aceptación'; }
+    showTh('selState');
+  } else { pr.classList.remove('vis'); ns.style.display='block'; }
+  render();
+}
+
+function togInit() {
+  if(A.sel?.type!=='state') return;
+  A.init = (A.init===A.sel.id) ? null : A.sel.id;
+  selItem('state',A.sel.id); render();
+}
+function togAcc() {
+  if(A.sel?.type!=='state') return;
+  const s=A.states.find(st=>st.id===A.sel.id);
+  if(s){ s.accepting=!s.accepting; selItem('state',A.sel.id); render(); }
+}
+function updLabel(v) {
+  if(A.sel?.type!=='state') return;
+  const s=A.states.find(st=>st.id===A.sel.id);
+  if(s){ s.label=v; render(); }
+}
+
+// ═══════════════════════════════════════════
+//  TOOLS
+// ═══════════════════════════════════════════
+function setTool(tool) {
+  A.tool=tool; A.tsrc=null; clearPr();
+  ['select','addState','addTransition','delete'].forEach(t=>document.getElementById(`btn-${t}`)?.classList.remove('active'));
+  document.getElementById(`btn-${tool}`)?.classList.add('active');
+  const wrap=document.getElementById('canvas-wrap');
+  wrap.className=''; wrap.classList.add(`cur-${tool}`);
+  const hints={select:'Clic para seleccionar · Doble clic para toggle aceptación · Arrastra para mover',addState:'Clic en el canvas para agregar un nuevo estado',addTransition:'Clic en el estado ORIGEN',delete:'Clic en estado o transición para eliminar'};
+  hint(hints[tool]||''); setStatus(hints[tool]||'');
+  if(tool==='addTransition') showTh('tranMode');
+  if(tool==='delete') showTh('delMode');
+  if(tool==='select') selItem(null);
+  render();
+}
+
+// ═══════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════
+A.modal=false;
+function openModal(){ document.getElementById('modal-bg').classList.add('open'); A.modal=true; document.getElementById('modal-in').value=''; setTimeout(()=>document.getElementById('modal-in').focus(),50); }
+function cancelModal(){ document.getElementById('modal-bg').classList.remove('open'); A.modal=false; A.pend=null; A.tsrc=null; clearPr(); render(); }
+function okModal(){
+  const raw=document.getElementById('modal-in').value.trim();
+  document.getElementById('modal-bg').classList.remove('open'); A.modal=false;
+  if(!raw||!A.pend){ A.pend=null; return; }
+  const syms=raw.split(',').map(s=>s.trim()).filter(s=>s);
+  addTran(A.pend.from,A.pend.to,syms); A.pend=null;
+}
+
+// ═══════════════════════════════════════════
+//  SIMULATION
+// ═══════════════════════════════════════════
+function runSim() {
+  if(!A.init){ showTh('noInit'); switchTab('theory',0); return; }
+  const str=document.getElementById('sim-str').value;
+  const res=fullSim(str);
+  A.sim.on=true; A.sim.cur=res.finalId; A.sim.lastSym=null;
+  showSimResult(res,str); render();
+}
+
+function fullSim(str) {
+  let cur=A.init; const trace=[{id:cur,sym:null}];
+  for(let i=0;i<str.length;i++) {
+    const sym=str[i];
+    const t=A.transitions.find(t=>t.from===cur&&t.symbols.includes(sym));
+    if(!t){ trace.push({id:null,sym,dead:true,at:i}); return{trace,accepted:false,finalId:cur,deadAt:i,deadSym:sym}; }
+    cur=t.to; trace.push({id:cur,sym});
+  }
+  const acc=A.states.find(s=>s.id===cur)?.accepting||false;
+  return{trace,accepted:acc,finalId:cur};
+}
+
+function showSimResult(res,str) {
+  const re=document.getElementById('sim-res'), tr=document.getElementById('trace-box'), tc=document.getElementById('trace-card');
+  tc.style.display='block';
+  if(res.accepted){ re.className='sim-res ok'; re.textContent=`✅ ACEPTADA: "${str||'ε'}" ∈ L(M)`; showTh('accepted'); }
+  else {
+    re.className='sim-res fail';
+    re.textContent=res.deadAt!==undefined ? `❌ RECHAZADA: sin δ(q,'${res.deadSym}')` : `❌ RECHAZADA: "${str||'ε'}" ∉ L(M)`;
+    showTh('rejected');
+  }
+  tr.innerHTML='';
+  for(const step of res.trace) {
+    const d=document.createElement('div'); d.className='sstep';
+    if(step.dead) d.innerHTML=`<span style="color:var(--error)">✗ Sin transición para '${step.sym}'</span>`;
+    else if(!step.sym) { const sl=A.states.find(s=>s.id===step.id); d.innerHTML=`<span class="ss">→ ${sl?.label}</span> <span style="color:#475569;font-size:10px">(inicio)</span>`; }
+    else { const sl=A.states.find(s=>s.id===step.id); d.innerHTML=`<span class="sa">──</span><span class="sy"> '${step.sym}' </span><span class="sa">──▶</span> <span class="ss">${sl?.label||'✗'}</span>`; }
+    tr.appendChild(d);
+  }
+}
+
+let stepState={};
+function stepSim() {
+  if(!A.init){ showTh('noInit'); return; }
+  const str=document.getElementById('sim-str').value;
+  if(!A.sim.on || A.sim.str!==str) {
+    A.sim={on:true,str,idx:0,cur:A.init,hist:[{id:A.init,sym:null}],lastSym:null};
+    document.getElementById('trace-card').style.display='block';
+    document.getElementById('sim-res').className='sim-res';
+    renderStepTrace(); render();
+    setStatus(`Paso 0/${str.length}: en estado inicial`); return;
+  }
+  if(A.sim.idx>=str.length) {
+    const acc=A.states.find(s=>s.id===A.sim.cur)?.accepting||false;
+    const re=document.getElementById('sim-res');
+    if(acc){ re.className='sim-res ok'; re.textContent=`✅ ACEPTADA: "${str||'ε'}" ∈ L(M)`; showTh('accepted'); }
+    else { re.className='sim-res fail'; re.textContent=`❌ RECHAZADA: estado final no es de aceptación`; showTh('rejected'); }
+    A.sim.on=false; render(); return;
+  }
+  const sym=str[A.sim.idx];
+  const t=A.transitions.find(t=>t.from===A.sim.cur&&t.symbols.includes(sym));
+  A.sim.lastSym=sym;
+  if(!t) {
+    const re=document.getElementById('sim-res'); re.className='sim-res fail'; re.textContent=`❌ RECHAZADA: sin δ(q,'${sym}')`;
+    showTh('rejected'); A.sim.on=false; render(); return;
+  }
+  A.sim.cur=t.to; A.sim.idx++; A.sim.hist.push({id:t.to,sym});
+  renderStepTrace(); render();
+  setStatus(`Paso ${A.sim.idx}/${str.length}: leyendo '${sym}'`);
+}
+
+function renderStepTrace() {
+  const tr=document.getElementById('trace-box'); tr.innerHTML='';
+  for(let i=0;i<A.sim.hist.length;i++) {
+    const h=A.sim.hist[i]; const d=document.createElement('div');
+    d.className='sstep'+(i===A.sim.hist.length-1?' cur':'');
+    const sl=A.states.find(s=>s.id===h.id);
+    if(!h.sym) d.innerHTML=`<span class="ss">→ ${sl?.label}</span> <span style="color:#475569;font-size:10px">(inicio)</span>`;
+    else d.innerHTML=`<span class="sa">──</span><span class="sy"> '${h.sym}' </span><span class="sa">──▶</span> <span class="ss">${sl?.label}</span>`;
+    tr.appendChild(d);
+  }
+}
+
+function resetSim() {
+  A.sim={on:false,str:'',idx:0,cur:null,hist:[],lastSym:null};
+  document.getElementById('sim-res').className='sim-res';
+  document.getElementById('trace-box').innerHTML='';
+  document.getElementById('trace-card').style.display='none';
+  document.getElementById('sim-str').value='';
+  render();
+}
+
+// ═══════════════════════════════════════════
+//  FORMAL DEF & STATS
+// ═══════════════════════════════════════════
+function updateFormal() {
+  const sigma=new Set(); A.transitions.forEach(t=>t.symbols.forEach(s=>sigma.add(s)));
+  const Q=A.states.map(s=>s.label).join(', ');
+  const F=A.states.filter(s=>s.accepting).map(s=>s.label).join(', ');
+  const q0=A.states.find(s=>s.id===A.init)?.label||'—';
+  document.getElementById('fQ').textContent=Q?`{${Q}}`:'{}';
+  document.getElementById('fS').textContent=sigma.size?`{${[...sigma].sort().join(', ')}}`:'{}';
+  document.getElementById('fq0').textContent=q0;
+  document.getElementById('fF').textContent=F?`{${F}}`:'{}';
+  const dd=document.getElementById('fDelta');
+  if(!A.transitions.length){ dd.textContent='(vacía)'; dd.style.color='var(--muted)'; return; }
+  const rows=[];
+  for(const t of A.transitions) {
+    const fs=A.states.find(s=>s.id===t.from), ts=A.states.find(s=>s.id===t.to);
+    for(const sym of t.symbols) rows.push(`δ(${fs?.label}, ${sym}) = ${ts?.label}`);
+  }
+  dd.innerHTML=rows.map(r=>`<div>${r}</div>`).join(''); dd.style.color='var(--accent2)';
+}
+
+function updateStats() {
+  const sigma=new Set(); A.transitions.forEach(t=>t.symbols.forEach(s=>sigma.add(s)));
+  document.getElementById('stQ').textContent=A.states.length;
+  document.getElementById('stT').textContent=A.transitions.length;
+  document.getElementById('stS').textContent=sigma.size?`{${[...sigma].sort().join(',')}}`:'{}';
+  let type='—';
+  if(A.states.length>0) {
+    let dfa=true;
+    for(const s of A.states) for(const sym of sigma) {
+      if(A.transitions.filter(t=>t.from===s.id&&t.symbols.includes(sym)).length>1){dfa=false;break;}
+    }
+    type=dfa?'AFD':'AFN';
+  }
+  document.getElementById('stType').textContent=type;
+}
+
+// ═══════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════
+function setStatus(m){ document.getElementById('status').textContent=m; }
+function hint(m){ const h=document.getElementById('hint'); h.textContent=m; h.style.display=m?'block':'none'; }
+function showTh(k){ if(TH[k]) document.getElementById('theory-box').innerHTML=TH[k]; }
+
+function switchTab(name,idx) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',i===idx));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById(`p${name}`)?.classList.add('on');
+  if(name==='formal') updateFormal();
+}
+
+function clearAll() {
+  if(A.states.length>0 && !confirm('¿Eliminar todo el autómata actual?')) return;
+  A.states=[]; A.transitions=[]; A.init=null; A.sel=null; A.tsrc=null; A.nid=0;
+  clearPr(); resetSim(); selItem(null); showTh('welcome'); render();
+  setStatus('Canvas limpiado');
+}
+
+function loadExample() {
+  clearAll();
+  // Example: DFA accepting binary strings ending in '1'
+  A.states=[
+    {id:0,x:160,y:260,label:'q0',accepting:false},
+    {id:1,x:400,y:260,label:'q1',accepting:true},
+  ];
+  A.transitions=[
+    {id:2,from:0,to:0,symbols:['0']},
+    {id:3,from:0,to:1,symbols:['1']},
+    {id:4,from:1,to:1,symbols:['1']},
+    {id:5,from:1,to:0,symbols:['0']},
+  ];
+  A.init=0; A.nid=10;
+  document.getElementById('theory-box').innerHTML=`
+<div class="tc new-card">
+  <h4>Ejemplo Cargado ✓</h4>
+  <p>Este AFD acepta todas las cadenas binarias que <strong>terminan en 1</strong>.</p>
+  <p>Cadenas aceptadas: <code style="color:var(--accent2)">1, 01, 11, 001, 101...</code></p>
+  <div class="formula">L = { w ∈ {0,1}* | w termina en '1' }</div>
+  <div class="tip">💡 Ve a la pestaña "Simular" y prueba cadenas como "101", "110", "0011"</div>
+</div>
+<div class="tc">
+  <h4>Lectura del Diseño</h4>
+  <ul>
+    <li><strong>q0</strong>: el último símbolo leído fue '0' (o aún no leímos nada)</li>
+    <li><strong>q1</strong> ◎: el último símbolo fue '1' → estado de aceptación</li>
+  </ul>
+  <p>Las transiciones "recuerdan" solo el último símbolo, ignorando el historial.</p>
+</div>`;
+  render(); setStatus('Ejemplo cargado: AFD que acepta cadenas terminadas en 1');
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+showTh('welcome');
+setTool('select');
+hint('Selecciona "Agregar Estado" (○) para comenzar');
+render();
+</script>
+</body>
+</html>
