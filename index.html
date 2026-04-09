@@ -802,7 +802,7 @@ function okModal(){
 //  SIMULATION
 // ═══════════════════════════════════════════
 function runSim() {
-  if(!A.init){ showTh('noInit'); switchTab('theory',0); return; }
+if(A.init === null){ showTh('noInit'); switchTab('theory',0); return; }
   const str=document.getElementById('sim-str').value;
   const res=fullSim(str);
   A.sim.on=true; A.sim.cur=res.finalId; A.sim.lastSym=null;
@@ -842,7 +842,7 @@ function showSimResult(res,str) {
 
 let stepState={};
 function stepSim() {
-  if(!A.init){ showTh('noInit'); return; }
+if(A.init === null){ showTh('noInit'); return; }
   const str=document.getElementById('sim-str').value;
   if(!A.sim.on || A.sim.str!==str) {
     A.sim={on:true,str,idx:0,cur:A.init,hist:[{id:A.init,sym:null}],lastSym:null};
